@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Charge! - The Hand Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ CHARGE! ⚡</h1>
+        <p class="subtitle">The classic hand game - now digital!</p>
+        
+        <div class="game-status">
+            <div class="turn-indicator" id="turnIndicator">Your Turn</div>
+        </div>
+        
+        <div class="game-board">
+            <!-- Player Area -->
+            <div class="player-area" id="playerArea">
+                <h2>You</h2>
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">Ammo:</span>
+                        <span class="stat-value" id="playerAmmo">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Lives:</span>
+                        <span class="stat-value" id="playerLives">3</span>
+                    </div>
+                </div>
+                <div class="action-buttons" id="playerActions">
+                    <button class="action-btn charge" data-action="charge">
+                        <span class="emoji">⚡</span>
+                        <span class="action-name">Charge (+1 Ammo)</span>
+                    </button>
+                    <button class="action-btn gun" data-action="gun">
+                        <span class="emoji">🔫</span>
+                        <span class="action-name">Gun (-1 Ammo)</span>
+                    </button>
+                    <button class="action-btn double-gun" data-action="doublegun">
+                        <span class="emoji">🔫🔫</span>
+                        <span class="action-name">Double Gun (-2 Ammo)</span>
+                    </button>
+                    <button class="action-btn shield" data-action="shield">
+                        <span class="emoji">🛡️</span>
+                        <span class="action-name">Shield (Free)</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- VS Divider -->
+            <div class="vs-divider">VS</div>
+            
+            <!-- Computer Area -->
+            <div class="computer-area" id="computerArea">
+                <h2>Computer</h2>
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">Ammo:</span>
+                        <span class="stat-value" id="computerAmmo">3</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Lives:</span>
+                        <span class="stat-value" id="computerLives">3</span>
+                    </div>
+                </div>
+                <div class="computer-choice-display" id="computerChoice">
+                    <span class="choice-emoji">❓</span>
+                    <span class="choice-text">Waiting...</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Game Log / Message Area -->
+        <div class="game-log" id="gameLog">
+            <p>Game started! Your turn.</p>
+        </div>
+        
+        <!-- Game Controls -->
+        <div class="game-controls">
+            <button class="control-btn" id="resetBtn">🔄 New Game</button>
+            <button class="control-btn" id="rulesBtn">📖 Rules</button>
+        </div>
+    </div>
+    
+    <!-- Rules Modal -->
+    <div class="modal" id="rulesModal">
+        <div class="modal-content">
+            <span class="close-btn" id="closeModal">&times;</span>
+            <h2>How to Play Charge!</h2>
+            <div class="rules-list">
+                <h3>Actions:</h3>
+                <ul>
+                    <li><strong>⚡ Charge:</strong> +1 Ammo</li>
+                    <li><strong>🔫 Gun:</strong> -1 Ammo, shoots opponent (if they don't shield)</li>
+                    <li><strong>🔫🔫 Double Gun:</strong> -2 Ammo, shoots opponent for 2 damage (if they don't shield)</li>
+                    <li><strong>🛡️ Shield:</strong> Free action, blocks all incoming damage</li>
+                </ul>
+                
+                <h3>Rules:</h3>
+                <ul>
+                    <li>You start with 3 Ammo and 3 Lives</li>
+                    <li>If you try to shoot without enough ammo, you lose 1 life (misfire)</li>
+                    <li>Shield blocks all damage but doesn't affect ammo</li>
+                    <li>Last player with lives wins!</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

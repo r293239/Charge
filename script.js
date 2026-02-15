@@ -1,67 +1,19 @@
-
 class ChargeGame {
     constructor() {
-        this.mode = '1v1'; // '1v1', '1v1v1', '1v1v1v1'
+        this.mode = '1v1';
         this.players = {};
         this.currentPlayer = null;
         this.playerOrder = [];
         this.gameActive = true;
+        this.waitingForTargets = false;
         this.pendingAction = null;
-        this.roundActions = [];
-        this.logs = [];
         
-        // Action definitions
         this.actions = {
-            charge: { 
-                name: 'Charge', 
-                emoji: '⚡', 
-                energyCost: 0,
-                energyGain: 1, 
-                damage: 0,
-                targets: 0,
-                beats: [], // What this action beats in direct confrontation
-                message: 'charged up!'
-            },
-            gun: { 
-                name: 'Gun', 
-                emoji: '🔫', 
-                energyCost: 1, 
-                energyGain: 0, 
-                damage: 1,
-                targets: 1,
-                beats: [], // Beats nothing by itself, depends on targets
-                message: 'fired!'
-            },
-            doublegun: { 
-                name: 'Double Gun', 
-                emoji: '🔫🔫', 
-                energyCost: 2, 
-                energyGain: 0, 
-                damage: 2,
-                targets: 2,
-                beats: ['gun'], // Double gun beats single gun in direct confrontation
-                message: 'unleashed a double shot!'
-            },
-            shield: { 
-                name: 'Shield', 
-                emoji: '🛡️', 
-                energyCost: 0, 
-                energyGain: 0, 
-                damage: 0,
-                targets: 0,
-                blocks: true,
-                message: 'raised a shield!'
-            },
-            tornado: { 
-                name: 'Tornado', 
-                emoji: '🌪️', 
-                energyCost: 6, 
-                energyGain: 0, 
-                damage: 999, // Instant kill
-                targets: 1,
-                ignoresShield: true,
-                message: 'SUMMONED A TORNADO!'
-            }
+            charge: { name: 'Charge', emoji: '⚡', cost: 0, gain: 1, targets: 0, desc: 'charged up!' },
+            gun: { name: 'Gun', emoji: '🔫', cost: 1, gain: 0, targets: 1, desc: 'shot at' },
+            doublegun: { name: 'Double Gun', emoji: '🔫🔫', cost: 2, gain: 0, targets: 2, desc: 'double shot at' },
+            shield: { name: 'Shield', emoji: '🛡️', cost: 0, gain: 0, targets: 0, desc: 'raised a shield!' },
+            tornado: { name: 'Tornado', emoji: '🌪️', cost: 6, gain: 0, targets: 1, desc: 'SUMMONED A TORNADO at' }
         };
         
         this.init();
@@ -69,16 +21,16 @@ class ChargeGame {
     
     init() {
         this.setupPlayers();
-        this.updateGameBoard();
+        this.renderGame();
         this.nextTurn();
     }
     
     setupPlayers() {
-        const playerCount = this.mode === '1v1' ? 2 : (this.mode === '1v1v1' ? 3 : 4);
+        const count = this.mode === '1v1' ? 2 : (this.mode === '1v1v1' ? 3 : 4);
         this.players = {};
         this.playerOrder = [];
         
-        for (let i = 1; i <= playerCount; i++) {
+        for (let i = 1; i <= count; i++) {
             this.players[i] = {
                 id: i,
                 name: `Player ${i}`,
@@ -90,7 +42,7 @@ class ChargeGame {
             this.playerOrder.push(i);
         }
         
-        // Randomize turn order for first round
+        // Randomize turn order
         this.shuffleArray(this.playerOrder);
     }
     
@@ -101,93 +53,75 @@ class ChargeGame {
         }
     }
     
-    updateGameBoard() {
+    renderGame() {
         const board = document.getElementById('gameBoard');
         board.innerHTML = '';
         
-        // Sort players by ID for consistent display
-        const sortedPlayers = Object.values(this.players).sort((a, b) => a.id - b.id);
-        
-        sortedPlayers.forEach(player => {
+        Object.values(this.players).forEach(player => {
             if (!player.alive) return;
             
-            const playerCard = document.createElement('div');
-            playerCard.className = `player-card alive ${this.currentPlayer === player.id ? 'current-turn' : ''}`;
-            playerCard.id = `player-${player.id}`;
+            const card = document.createElement('div');
+            card.className = `player-card ${this.currentPlayer === player.id ? 'current-turn' : ''}`;
+            card.id = `player-${player.id}`;
             
-            playerCard.innerHTML = `
+            let buttons = '';
+            Object.entries(this.actions).forEach(([key, action]) => {
+                const disabled = !this.gameActive || 
+                               this.currentPlayer !== player.id || 
+                               player.action !== null ||
+                               action.cost > player.energy;
+                
+                buttons += `<button class="action-btn ${key}" data-player="${player.id}" data-action="${key}" ${disabled ? 'disabled' : ''}>
+                    ${action.emoji} ${action.name} (${action.cost})
+                </button>`;
+            });
+            
+            card.innerHTML = `
                 <div class="player-name">${player.name}</div>
-                <div class="player-stats">
-                    <div class="player-energy">${player.energy}</div>
-                    <div class="player-energy-label">Energy</div>
-                </div>
-                <div class="player-actions" data-player="${player.id}">
-                    <button class="action-btn charge" data-action="charge">
-                        <span class="emoji">⚡</span>
-                        <span class="action-name">Charge</span>
-                    </button>
-                    <button class="action-btn gun" data-action="gun">
-                        <span class="emoji">🔫</span>
-                        <span class="action-name">Gun</span>
-                    </button>
-                    <button class="action-btn doublegun" data-action="doublegun">
-                        <span class="emoji">🔫🔫</span>
-                        <span class="action-name">Double</span>
-                    </button>
-                    <button class="action-btn shield" data-action="shield">
-                        <span class="emoji">🛡️</span>
-                        <span class="action-name">Shield</span>
-                    </button>
-                    <button class="action-btn tornado" data-action="tornado">
-                        <span class="emoji">🌪️</span>
-                        <span class="action-name">Tornado (6)</span>
-                    </button>
+                <div class="player-energy">${player.energy}</div>
+                <div class="energy-label">Energy</div>
+                <div class="action-buttons">
+                    ${buttons}
                 </div>
             `;
             
-            board.appendChild(playerCard);
+            board.appendChild(card);
         });
         
-        this.updateButtonStates();
-        this.addActionListeners();
+        this.addEventListeners();
     }
     
-    addActionListeners() {
+    addEventListeners() {
         document.querySelectorAll('.action-btn').forEach(btn => {
-            btn.removeEventListener('click', this.actionHandler);
-            this.actionHandler = (e) => {
-                const playerCard = btn.closest('.player-card');
-                if (!playerCard) return;
-                
-                const playerId = parseInt(playerCard.id.split('-')[1]);
+            btn.addEventListener('click', (e) => {
+                const playerId = parseInt(btn.dataset.player);
                 const action = btn.dataset.action;
                 this.handleAction(playerId, action);
-            };
-            btn.addEventListener('click', this.actionHandler);
+            });
         });
     }
     
     handleAction(playerId, actionKey) {
         if (!this.gameActive) return;
         if (this.currentPlayer !== playerId) {
-            this.log(`⛔ Not your turn! It's ${this.players[this.currentPlayer].name}'s turn`);
+            this.log(`Not ${this.players[playerId].name}'s turn!`);
             return;
         }
         
         const player = this.players[playerId];
         const action = this.actions[actionKey];
         
-        // Check energy
-        if (action.energyCost > player.energy) {
-            this.log(`❌ Not enough energy! Need ${action.energyCost} energy`);
+        if (action.cost > player.energy) {
+            this.log(`Not enough energy! Need ${action.cost}`);
             return;
         }
         
-        // Handle targeting
         if (action.targets > 0) {
+            // Show target selection
+            this.pendingAction = { playerId, actionKey };
             this.showTargetModal(playerId, action);
         } else {
-            // No targeting needed (charge or shield)
+            // No targeting needed
             this.submitAction(playerId, actionKey, []);
         }
     }
@@ -195,60 +129,57 @@ class ChargeGame {
     showTargetModal(playerId, action) {
         const modal = document.getElementById('targetModal');
         const title = document.getElementById('targetModalTitle');
-        const targetButtons = document.getElementById('targetButtons');
+        const buttons = document.getElementById('targetButtons');
+        const selected = [];
         
-        title.textContent = `${action.name} - Choose ${action.targets} target${action.targets > 1 ? 's' : ''}`;
-        targetButtons.innerHTML = '';
+        title.textContent = `${action.name} - Choose ${action.targets} target(s)`;
+        buttons.innerHTML = '';
         
-        // Get alive targets (excluding self)
+        // Get alive targets (exclude self)
         const targets = Object.values(this.players).filter(p => p.alive && p.id !== playerId);
         
         if (action.targets === 1) {
-            // Single target - simple buttons
+            // Single target
             targets.forEach(target => {
                 const btn = document.createElement('button');
                 btn.className = 'target-btn';
                 btn.textContent = target.name;
                 btn.onclick = () => {
-                    this.submitAction(playerId, action.name.toLowerCase(), [target.id]);
+                    this.submitAction(playerId, action.name.toLowerCase().replace(' ', ''), [target.id]);
                     modal.style.display = 'none';
                 };
-                targetButtons.appendChild(btn);
+                buttons.appendChild(btn);
             });
         } else {
-            // Double gun - need to select two different targets
-            const selectedTargets = [];
-            
+            // Two targets
             targets.forEach(target => {
                 const btn = document.createElement('button');
                 btn.className = 'target-btn';
                 btn.textContent = target.name;
                 btn.onclick = () => {
-                    if (selectedTargets.includes(target.id)) {
-                        // Deselect
-                        const index = selectedTargets.indexOf(target.id);
-                        selectedTargets.splice(index, 1);
-                        btn.classList.remove('selected');
-                    } else {
-                        // Select
-                        if (selectedTargets.length < 2) {
-                            selectedTargets.push(target.id);
+                    const index = selected.indexOf(target.id);
+                    if (index === -1) {
+                        if (selected.length < 2) {
+                            selected.push(target.id);
                             btn.classList.add('selected');
                         }
+                    } else {
+                        selected.splice(index, 1);
+                        btn.classList.remove('selected');
                     }
                     
-                    // If we have 2 targets, submit
-                    if (selectedTargets.length === 2) {
-                        this.submitAction(playerId, action.name.toLowerCase(), selectedTargets);
+                    if (selected.length === 2) {
+                        this.submitAction(playerId, action.name.toLowerCase().replace(' ', ''), selected);
                         modal.style.display = 'none';
                     }
                 };
-                targetButtons.appendChild(btn);
+                buttons.appendChild(btn);
             });
         }
         
         document.getElementById('cancelTarget').onclick = () => {
             modal.style.display = 'none';
+            this.pendingAction = null;
         };
         
         modal.style.display = 'flex';
@@ -258,87 +189,69 @@ class ChargeGame {
         const player = this.players[playerId];
         const action = this.actions[actionKey];
         
-        // Deduct energy
-        player.energy -= action.energyCost;
-        player.energy += action.energyGain;
+        // Apply energy changes
+        player.energy -= action.cost;
+        player.energy += action.gain;
         
         // Store action
         player.action = actionKey;
         player.targets = targets;
         
         // Log
-        let targetNames = targets.map(t => this.players[t].name).join(' and ');
-        this.log(`${player.name} ${action.message} ${targetNames ? 'at ' + targetNames : ''}`);
+        let targetNames = targets.map(t => this.players[t]?.name).join(' and ');
+        this.log(`${player.name} ${action.desc} ${targetNames || ''}`);
         
         // Move to next player
         this.nextTurn();
     }
     
     nextTurn() {
-        // Find next alive player
+        // Find next player who hasn't acted yet
         const currentIndex = this.playerOrder.indexOf(this.currentPlayer);
         
         for (let i = 1; i <= this.playerOrder.length; i++) {
             const nextIndex = (currentIndex + i) % this.playerOrder.length;
-            const nextPlayerId = this.playerOrder[nextIndex];
+            const nextId = this.playerOrder[nextIndex];
             
-            if (this.players[nextPlayerId]?.alive) {
-                // Check if this player has already acted
-                if (!this.players[nextPlayerId].action) {
-                    this.currentPlayer = nextPlayerId;
-                    this.updateGameBoard();
-                    this.log(`${this.players[nextPlayerId].name}'s turn`);
-                    return;
-                }
+            if (this.players[nextId]?.alive && !this.players[nextId].action) {
+                this.currentPlayer = nextId;
+                this.renderGame();
+                this.log(`${this.players[nextId].name}'s turn`);
+                return;
             }
         }
         
-        // If we get here, all players have acted - resolve round
+        // Everyone has acted - resolve round
         this.resolveRound();
     }
     
     resolveRound() {
         this.log('=== ROUND RESOLUTION ===');
         
-        // Process tornadoes first (they ignore everything)
-        const tornadoUsers = Object.values(this.players).filter(p => p.alive && p.action === 'tornado');
-        tornadoUsers.forEach(tornadoUser => {
-            tornadoUser.targets.forEach(targetId => {
-                if (this.players[targetId]?.alive) {
-                    this.players[targetId].alive = false;
-                    this.log(`🌪️ TORNADO KILLS ${this.players[targetId].name}! NO ESCAPE!`);
-                }
-            });
+        // Process tornadoes first (ignore everything)
+        Object.values(this.players).forEach(player => {
+            if (player.alive && player.action === 'tornado') {
+                player.targets.forEach(targetId => {
+                    if (this.players[targetId]?.alive) {
+                        this.players[targetId].alive = false;
+                        this.log(`🌪️ TORNADO KILLED ${this.players[targetId].name}!`);
+                    }
+                });
+            }
         });
-        
-        // Check for survivors
-        const survivors = Object.values(this.players).filter(p => p.alive);
-        if (survivors.length <= 1) {
-            this.endGame(survivors[0]?.id || null);
-            return;
-        }
         
         // Process gun fights
-        const gunUsers = Object.values(this.players).filter(p => p.alive && (p.action === 'gun' || p.action === 'doublegun'));
-        
-        // Create a map of who's shooting who
-        const shotMap = {};
-        gunUsers.forEach(shooter => {
-            shooter.targets.forEach(targetId => {
-                if (!this.players[targetId]?.alive) return; // Target already dead from tornado
-                
-                if (!shotMap[targetId]) shotMap[targetId] = [];
-                shotMap[targetId].push({
-                    shooter: shooter.id,
-                    power: shooter.action === 'doublegun' ? 2 : 1
-                });
-            });
-        });
-        
-        // Process each target
-        Object.entries(shotMap).forEach(([targetId, attackers]) => {
-            const target = this.players[parseInt(targetId)];
-            if (!target?.alive) return;
+        Object.values(this.players).forEach(target => {
+            if (!target.alive) return;
+            
+            // Find who's shooting at this target
+            const shooters = Object.values(this.players).filter(shooter => 
+                shooter.alive && 
+                shooter.targets?.includes(target.id) &&
+                (shooter.action === 'gun' || shooter.action === 'doublegun')
+            );
+            
+            if (shooters.length === 0) return;
             
             // Check if target used shield
             if (target.action === 'shield') {
@@ -346,123 +259,85 @@ class ChargeGame {
                 return;
             }
             
-            // Check for mutual combat
-            const mutualAttacks = attackers.filter(a => 
-                this.players[a.shooter]?.targets?.includes(target.id)
-            );
+            // Check for double gun vs single gun
+            const hasDouble = shooters.some(s => s.action === 'doublegun');
+            const hasSingle = shooters.some(s => s.action === 'gun');
             
-            // Double gun beats single gun
-            const hasDoubleGun = attackers.some(a => a.power === 2);
-            const hasSingleGun = attackers.some(a => a.power === 1);
-            
-            if (hasDoubleGun && hasSingleGun) {
-                // Double gun wins
-                const doubleGunners = attackers.filter(a => a.power === 2);
-                const singleGunners = attackers.filter(a => a.power === 1);
-                
-                // Single gunners die
-                singleGunners.forEach(gunner => {
-                    if (this.players[gunner.shooter]?.alive) {
-                        this.players[gunner.shooter].alive = false;
-                        this.log(`💥 ${this.players[gunner.shooter].name} tried to single gun but got outgunned!`);
+            if (hasDouble && hasSingle) {
+                // Double gunners survive, single gunners die
+                shooters.forEach(shooter => {
+                    if (shooter.action === 'gun') {
+                        shooter.alive = false;
+                        this.log(`💥 ${shooter.name} tried to single gun but got outgunned!`);
                     }
                 });
-                
-                // Target dies to double gun
                 target.alive = false;
                 this.log(`💥 ${target.name} was killed by double gun!`);
-                
-            } else if (mutualAttacks.length === attackers.length && attackers.length > 1) {
-                // Everyone shooting each other - cancel out
-                this.log(`🤝 Mutual combat! Everyone attacking ${target.name} cancels out`);
-                
-            } else {
-                // Normal hit
-                const totalDamage = attackers.reduce((sum, a) => sum + a.power, 0);
+            } 
+            else if (shooters.length > 1 && shooters.every(s => s.targets?.includes(target.id))) {
+                // Mutual combat - everyone dies
+                shooters.forEach(shooter => {
+                    shooter.alive = false;
+                });
                 target.alive = false;
-                this.log(`💥 ${target.name} was hit for ${totalDamage} damage!`);
+                this.log(`💥 MASSACRE! Everyone involved died!`);
+            }
+            else {
+                // Normal hit
+                target.alive = false;
+                this.log(`💥 ${target.name} was killed!`);
             }
         });
         
-        // Check for survivors again
-        const finalSurvivors = Object.values(this.players).filter(p => p.alive);
-        if (finalSurvivors.length <= 1) {
-            this.endGame(finalSurvivors[0]?.id || null);
-            return;
-        }
+        // Check for winner
+        const survivors = Object.values(this.players).filter(p => p.alive);
         
-        // Prepare for next round
-        this.prepareNextRound();
+        if (survivors.length <= 1) {
+            this.endGame(survivors[0]?.id || null);
+        } else {
+            // Next round
+            this.prepareNextRound();
+        }
     }
     
     prepareNextRound() {
-        // Clear actions
+        // Reset actions
         Object.values(this.players).forEach(player => {
             player.action = null;
             player.targets = [];
         });
         
-        // Remove dead players from turn order
+        // Remove dead players
         this.playerOrder = this.playerOrder.filter(id => this.players[id]?.alive);
         
-        // Randomize turn order for next round
+        // Shuffle order for next round
         this.shuffleArray(this.playerOrder);
         
-        // Set first player
+        // Start next round
         this.currentPlayer = this.playerOrder[0];
-        
-        // Update display
-        this.updateGameBoard();
+        this.renderGame();
         this.log(`=== NEW ROUND ===\n${this.players[this.currentPlayer].name} starts!`);
     }
     
     endGame(winnerId) {
         this.gameActive = false;
-        this.disableAllButtons();
         
         if (!winnerId) {
             this.log('💀 GAME OVER - EVERYONE DIED!');
-            document.querySelector('.turn-indicator').textContent = 'GAME OVER - DRAW!';
+            document.getElementById('turnIndicator').textContent = 'GAME OVER - DRAW!';
         } else {
             this.log(`🎉 ${this.players[winnerId].name} WINS! 🎉`);
-            document.querySelector('.turn-indicator').textContent = `${this.players[winnerId].name} WINS!`;
-            
-            // Highlight winner
-            document.getElementById(`player-${winnerId}`).classList.add('winner-glow');
+            document.getElementById('turnIndicator').textContent = `${this.players[winnerId].name} WINS!`;
         }
-    }
-    
-    updateButtonStates() {
-        document.querySelectorAll('.player-card').forEach(card => {
-            const playerId = parseInt(card.id.split('-')[1]);
-            const player = this.players[playerId];
-            const buttons = card.querySelectorAll('.action-btn');
-            
-            buttons.forEach(btn => {
-                const action = this.actions[btn.dataset.action];
-                btn.disabled = !this.gameActive || 
-                              this.currentPlayer !== playerId || 
-                              player.action !== null ||
-                              action.energyCost > player.energy;
-            });
-        });
-    }
-    
-    disableAllButtons() {
-        document.querySelectorAll('.action-btn').forEach(btn => btn.disabled = true);
+        
+        this.renderGame();
     }
     
     log(message) {
-        this.logs.push(message);
-        const logElement = document.getElementById('actionLog');
-        const p = document.createElement('p');
-        p.textContent = message;
-        logElement.appendChild(p);
-        logElement.scrollTop = logElement.scrollHeight;
-        
-        // Keep last 10 messages
-        if (logElement.children.length > 10) {
-            logElement.removeChild(logElement.children[0]);
+        const log = document.getElementById('actionLog');
+        log.innerHTML = message + '<br>' + log.innerHTML;
+        if (log.children.length > 5) {
+            log.removeChild(log.lastChild);
         }
     }
     
@@ -475,24 +350,19 @@ class ChargeGame {
         this.setupPlayers();
         this.gameActive = true;
         this.pendingAction = null;
-        this.roundActions = [];
-        this.logs = [];
-        
-        // Clear log
-        document.getElementById('actionLog').innerHTML = '';
-        
-        this.updateGameBoard();
+        document.getElementById('actionLog').innerHTML = 'Game started!';
+        this.renderGame();
         this.nextTurn();
     }
 }
 
-// Initialize game
+// Initialize when page loads
 document.addEventListener('DOMContentLoaded', () => {
     const game = new ChargeGame();
     
-    // Mode selector
+    // Mode buttons
     document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', () => {
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             game.setMode(btn.dataset.mode);
@@ -505,29 +375,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Rules modal
-    const modal = document.getElementById('rulesModal');
-    const rulesBtn = document.getElementById('rulesBtn');
-    const closeBtn = document.getElementById('closeModal');
-    
-    rulesBtn.addEventListener('click', () => {
-        modal.style.display = 'flex';
+    const rulesModal = document.getElementById('rulesModal');
+    document.getElementById('rulesBtn').addEventListener('click', () => {
+        rulesModal.style.display = 'flex';
     });
     
-    closeBtn.addEventListener('click', () => {
-        modal.style.display = 'none';
+    document.getElementById('closeModal').addEventListener('click', () => {
+        rulesModal.style.display = 'none';
     });
     
     window.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.style.display = 'none';
+        if (e.target === rulesModal) {
+            rulesModal.style.display = 'none';
         }
     });
     
-    // Close target modal when clicking outside
+    // Target modal close on outside click
+    const targetModal = document.getElementById('targetModal');
     window.addEventListener('click', (e) => {
-        const targetModal = document.getElementById('targetModal');
         if (e.target === targetModal) {
             targetModal.style.display = 'none';
+            game.pendingAction = null;
         }
     });
 });

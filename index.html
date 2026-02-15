@@ -3,78 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Charge! - The Hand Game</title>
+    <title>CHARGE! - Multiplayer Mayhem</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <h1>⚡ CHARGE! ⚡</h1>
-        <p class="subtitle">The classic hand game - now digital!</p>
+        <p class="subtitle">Multiplayer chaos - Choose your targets!</p>
         
-        <div class="game-status">
-            <div class="turn-indicator" id="turnIndicator">Your Turn</div>
+        <div class="game-mode-selector">
+            <button class="mode-btn active" data-mode="1v1">1v1</button>
+            <button class="mode-btn" data-mode="1v1v1">1v1v1</button>
+            <button class="mode-btn" data-mode="1v1v1v1">1v1v1v1</button>
         </div>
         
-        <div class="game-board">
-            <!-- Player Area -->
-            <div class="player-area" id="playerArea">
-                <h2>You</h2>
-                <div class="stats">
-                    <div class="stat">
-                        <span class="stat-label">Ammo:</span>
-                        <span class="stat-value" id="playerAmmo">0</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Lives:</span>
-                        <span class="stat-value" id="playerLives">3</span>
-                    </div>
-                </div>
-                <div class="action-buttons" id="playerActions">
-                    <button class="action-btn charge" data-action="charge">
-                        <span class="emoji">⚡</span>
-                        <span class="action-name">Charge (+1 Ammo)</span>
-                    </button>
-                    <button class="action-btn gun" data-action="gun">
-                        <span class="emoji">🔫</span>
-                        <span class="action-name">Gun (-1 Ammo)</span>
-                    </button>
-                    <button class="action-btn double-gun" data-action="doublegun">
-                        <span class="emoji">🔫🔫</span>
-                        <span class="action-name">Double Gun (-2 Ammo)</span>
-                    </button>
-                    <button class="action-btn shield" data-action="shield">
-                        <span class="emoji">🛡️</span>
-                        <span class="action-name">Shield (Free)</span>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- VS Divider -->
-            <div class="vs-divider">VS</div>
-            
-            <!-- Computer Area -->
-            <div class="computer-area" id="computerArea">
-                <h2>Computer</h2>
-                <div class="stats">
-                    <div class="stat">
-                        <span class="stat-label">Ammo:</span>
-                        <span class="stat-value" id="computerAmmo">3</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-label">Lives:</span>
-                        <span class="stat-value" id="computerLives">3</span>
-                    </div>
-                </div>
-                <div class="computer-choice-display" id="computerChoice">
-                    <span class="choice-emoji">❓</span>
-                    <span class="choice-text">Waiting...</span>
-                </div>
+        <div class="turn-indicator" id="turnIndicator">Player 1's Turn</div>
+        <div class="energy-display" id="energyDisplay">Energy: 0/6</div>
+        
+        <div class="game-board" id="gameBoard">
+            <!-- Players will be generated here by JavaScript -->
+        </div>
+        
+        <!-- Target Selection Modal (shows when using gun/double gun) -->
+        <div class="target-modal" id="targetModal">
+            <div class="target-modal-content">
+                <h2 id="targetModalTitle">Choose your target</h2>
+                <div class="target-buttons" id="targetButtons"></div>
+                <button class="cancel-target" id="cancelTarget">Cancel</button>
             </div>
         </div>
         
-        <!-- Game Log / Message Area -->
-        <div class="game-log" id="gameLog">
-            <p>Game started! Your turn.</p>
+        <!-- Action Log -->
+        <div class="action-log" id="actionLog">
+            <p>Game started! Player 1's turn</p>
         </div>
         
         <!-- Game Controls -->
@@ -88,23 +49,42 @@
     <div class="modal" id="rulesModal">
         <div class="modal-content">
             <span class="close-btn" id="closeModal">&times;</span>
-            <h2>How to Play Charge!</h2>
+            <h2>⚡ REAL CHARGE! Rules ⚡</h2>
             <div class="rules-list">
-                <h3>Actions:</h3>
+                <h3>Starting:</h3>
                 <ul>
-                    <li><strong>⚡ Charge:</strong> +1 Ammo</li>
-                    <li><strong>🔫 Gun:</strong> -1 Ammo, shoots opponent (if they don't shield)</li>
-                    <li><strong>🔫🔫 Double Gun:</strong> -2 Ammo, shoots opponent for 2 damage (if they don't shield)</li>
-                    <li><strong>🛡️ Shield:</strong> Free action, blocks all incoming damage</li>
+                    <li>1 Life, 0 Energy (ammo) each</li>
                 </ul>
                 
-                <h3>Rules:</h3>
+                <h3>Actions (cost energy):</h3>
                 <ul>
-                    <li>You start with 3 Ammo and 3 Lives</li>
-                    <li>If you try to shoot without enough ammo, you lose 1 life (misfire)</li>
-                    <li>Shield blocks all damage but doesn't affect ammo</li>
-                    <li>Last player with lives wins!</li>
+                    <li><strong>⚡ Charge:</strong> +1 Energy</li>
+                    <li><strong>🔫 Gun:</strong> -1 Energy - Shoot ONE player</li>
+                    <li><strong>🔫🔫 Double Gun:</strong> -2 Energy - Shoot TWO different players</li>
+                    <li><strong>🛡️ Shield:</strong> Free - Blocks all incoming damage</li>
+                    <li><strong>🌪️ Tornado (6 Energy):</strong> -6 Energy - INSTANT KILL one player (ignores shield!)</li>
                 </ul>
+                
+                <h3>Combat Rules:</h3>
+                <ul>
+                    <li>If two players shoot each other → Cancel out (both survive)</li>
+                    <li>Double Gun beats single Gun</li>
+                    <li>If you shoot someone who's shooting someone else → Nothing happens (too chaotic)</li>
+                    <li>Shield blocks Gun and Double Gun (but not Tornado!)</li>
+                    <li>Tornado kills ANYONE instantly - NO counterplay!</li>
+                </ul>
+                
+                <h3>Targeting:</h3>
+                <ul>
+                    <li>When you use Gun, choose ONE player to shoot</li>
+                    <li>When you use Double Gun, choose TWO different players to shoot</li>
+                    <li>When you use Tornado, choose ONE player to DELETE</li>
+                </ul>
+                
+                <h3>Example:</h3>
+                <p>P1 shoots P2, P2 shoots P1 → Both survive (cancel out)<br>
+                P1 double guns P2 and P3 → Beats both if they single gun anyone<br>
+                P1 tornadoes P2 → P2 dies NO MATTER WHAT (even with shield!)</p>
             </div>
         </div>
     </div>
